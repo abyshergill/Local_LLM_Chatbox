@@ -96,8 +96,9 @@ Local LLM Chatbox/
 ├── icon/
 │   └── icon.ico           (Optional: Application icon)
 ├── utility/               (Deal with Ollama related opeation)
-│   ├── getmodels.py
-│   └── runllm.py
+│   ├── getmodels.py       (This will fetch all the availabe model)
+│   └── runllm.py          (Run the selected model)
+│   └── startollama.py     (Start the ollama to work with)
 ├── readme.md              (Project Information)
 ├── license.txt
 ```
@@ -107,4 +108,9 @@ Local LLM Chatbox/
 This project is licensed under the Apache 2.0 License.
 
 ---
+`Note :`- 
+* Who want to directly use on windows with .exe file for try can contact me.
+* With .exe you can run this application without python or any other application if you already have model in your system.
+
+
 Creator : Aby Email : shergillkuldeep@outlook.com | Repo : [github.com/abyshergill](https://github.com/abyshergill/Local_LLM_Chatbox)
