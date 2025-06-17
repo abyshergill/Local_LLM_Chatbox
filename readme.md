@@ -100,13 +100,6 @@ Local LLM Chatbox/
 │   └── runllm.py
 ├── readme.md              (Project Information)
 ├── license.txt
-----------------------------------------------------------------------------
-Those local llm but want to try inteface without python setup can download is folder and can run main.exe
-Note: - First time run  it will show warning because create pyinstaller if you run anyways it will work fine.
-├── windows_exe/   
-│   └── _internal/
-│   └── main.exe   
-
 ```
 
 ## License
