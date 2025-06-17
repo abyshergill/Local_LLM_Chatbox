@@ -101,7 +101,6 @@ Local LLM Chatbox/
 │   └── startollama.py     (Start the ollama to work with)
 ├── readme.md              (Project Information)
 ├── license.txt
-
 ```
 
 ## License
