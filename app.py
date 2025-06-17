@@ -9,6 +9,7 @@ import os
 
 from utility.getmodels import get_local_llm_models
 from utility.runllm import run_llm_inference
+from utility.startollama import start_ollama_process
 
 # --- Main Application Class ---
 class LLMChatApp(ctk.CTk):
@@ -125,33 +126,67 @@ class LLMChatApp(ctk.CTk):
         self.control_panel.grid(row=3, column=0, padx=10, pady=(10, 10), sticky="ew", columnspan=2)
         self.control_panel.columnconfigure((0, 1, 2), weight=1) 
 
+                # Multiprocessing variables
+        self.response_queue = multiprocessing.Queue()
+        self.llm_process = None
+        self.current_llm_full_response = "" # Accumulates the full response for final Markdown parsing
+        self.llm_response_content_start_idx = None # To store the Text widget index where LLM content starts
+        self.ollama_server_process = None # To store the Popen object of the Ollama server process
+
+        # --- Attempt to start Ollama if not running ---
+        ollama_running, detected_models = get_local_llm_models() # Get the boolean and the list
+        if not ollama_running:
+            #print("Ollama server not detected. Attempting to start...")
+            self.display_message("System", "Attempting to start Ollama server...", "blue")
+            self.ollama_server_process = start_ollama_process()
+            if self.ollama_server_process:
+                # Give Ollama some time to start up and become responsive
+                startup_attempts = 0
+                max_attempts = 30 # Try for up to 3 seconds (30 * 0.1s)
+                while startup_attempts < max_attempts:
+                    time.sleep(0.1) # Wait 100ms
+                    ollama_running, detected_models = get_local_llm_models() # Re-check
+                    if ollama_running:
+                        self.display_message("System", "Ollama server started successfully. Fetching models...", "blue")
+                        break
+                    startup_attempts += 1
+                if not ollama_running:
+                    error_msg = "Failed to start Ollama server or connect to it. Please start Ollama manually."
+                    #print(error_msg)
+                    self.display_message("System", error_msg, "red")
+            else:
+                error_msg = "Could not initiate Ollama server startup process. Check your Ollama installation and PATH."
+                #print(error_msg)
+                self.display_message("System", error_msg, "red")
+
+        self.model_options = detected_models if detected_models else ["No local models found (Start Ollama manually)"]
+        
         # Model Selection
-        self.model_label = ctk.CTkLabel(self.control_panel, text="Choose Model:", font=("Helvetica", 14))
+        self.model_label = ctk.CTkLabel(self.control_panel, text="Choose Model:", font=("Helvetica", 12))
         self.model_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        local_models = get_local_llm_models()
-        self.model_options = local_models if local_models else ["No local models found (Start Ollama)"]
-        self.selected_model = ctk.StringVar(value=self.model_options[0])
+        
+        self.selected_model = ctk.StringVar(value=self.model_options[0]) # Use the correctly populated list here
         self.model_dropdown = ctk.CTkOptionMenu(
             self.control_panel,
             values=self.model_options,
             variable=self.selected_model,
-            width=200,
-            font=("Helvetica", 16)
+            width=180,
+            font=("Helvetica", 12)
         )
         self.model_dropdown.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
 
-        # Creativity | Temperature Slider
-        self.temperature_label = ctk.CTkLabel(self.control_panel, text="Set Creativity :", font=("Helvetica", 14 ))
+        # Temperature Slider
+        self.temperature_label = ctk.CTkLabel(self.control_panel, text="Temperature:", font=("Helvetica", 12))
         self.temperature_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
 
         self.temperature_slider = ctk.CTkSlider(
             self.control_panel,
             from_=0.0,
             to=1.0,
-            number_of_steps=100, 
+            number_of_steps=100, # 0.01 increments
             command=self.update_temperature_label
         )
-        self.temperature_slider.set(0.7) 
+        self.temperature_slider.set(0.7) # Default temperature
         self.temperature_slider.grid(row=1, column=1, padx=10, pady=5, sticky="ew")
 
         self.temperature_value_label = ctk.CTkLabel(
@@ -161,15 +196,11 @@ class LLMChatApp(ctk.CTk):
         )
         self.temperature_value_label.grid(row=1, column=2, padx=10, pady=5, sticky="w")
 
-        # Multiprocessing variables
-        self.response_queue = multiprocessing.Queue()
-        self.llm_process = None
-        self.current_llm_full_response = "" 
-        self.llm_response_content_start_idx = None 
-
         # Initial message
         self.display_message("I am BOT Octopus!", "Here to assist you with anything you need!", "blue")
 
+        # Add a cleanup handler for when the app closes
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
  
     def update_temperature_label(self, value):
         """Updates the temperature value label next to the slider."""
@@ -182,6 +213,25 @@ class LLMChatApp(ctk.CTk):
         else:
             self.send_message()
             return "break" 
+
+    def on_closing(self):
+        """
+        Cleans up the Ollama subprocess if it was started by the application.
+        This method is called when the application window is closed.
+        """
+        if self.ollama_server_process and self.ollama_server_process.poll() is None: # Check if still running
+            #print("Terminating Ollama server process started by the application...")
+            try:
+                self.ollama_server_process.terminate()
+                self.ollama_server_process.wait(timeout=5)    # Wait for it to terminate 
+                if self.ollama_server_process.poll() is None: # Check if it terminated
+                    #print("Ollama process did not terminate , kill it .")
+                    self.ollama_server_process.kill()          # Force kill if necessary
+            except Exception as e:
+                #print(f"Error terminating Ollama process: {e}")
+                self.display_message(f"Error terminating Ollama process: {e}")
+            self.destroy() # Close the CTkinter window
+
 
     def send_message(self):
         """Sends the user's message and initiates LLM response in a new process."""
@@ -319,7 +369,7 @@ class LLMChatApp(ctk.CTk):
         """
         lines = markdown_text.split('\n')
         for line in lines:
-            line = line.strip() # Trim whitespace for parsing
+            line = line.strip() 
 
             # Handle block-level elements first
             if line.startswith('### '):
@@ -337,7 +387,11 @@ class LLMChatApp(ctk.CTk):
                 for part in parts:
                     if part.startswith('**') and part.endswith('**'):
                         text_widget.insert(tk.END, part[2:-2], ("bold", default_tag))
+                    elif part.startswith('**') and part.endswith('**:'):
+                        text_widget.insert(tk.END, part[2:-2], ("bold", default_tag ))                  
                     elif part.startswith('*') and part.endswith('*'):
+                        text_widget.insert(tk.END, part[1:-1], ("italic", default_tag))
+                    elif part.startswith('*') and part.endswith('*:'):
                         text_widget.insert(tk.END, part[1:-1], ("italic", default_tag))
                     else:
                         text_widget.insert(tk.END, part, default_tag)
