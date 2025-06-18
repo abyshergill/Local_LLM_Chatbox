@@ -30,7 +30,12 @@ Before running the application, you need to have:
 
 * **Python 3.7+:** It's highly recommended to use Python 3.11 or 3.12 for best compatibility with customtkinter. Because GUI is written using customtkinter.
 
-* **Ollama:** A local Ollama server running. You can download and install Ollama from ollama.com.
+* **Install Ollama**
+   - Visit [Ollama's website](https://ollama.ai) to download and install
+   - Pull required models:
+     ```bash
+     ollama pull llama3.2  # or your preferred model
+     ```
 
 * **Local LLM Models:** Pull at least one LLM model using Ollama (e.g., ollama pull llama3).
 
@@ -101,6 +106,7 @@ Local LLM Chatbox/
 │   └── startollama.py     (Start the ollama to work with)
 ├── readme.md              (Project Information)
 ├── license.txt
+
 ```
 
 ## License
